@@ -1,0 +1,385 @@
+---
+title: "LogisticRegression"
+output: 
+  html_document:
+    toc : TRUE
+    theme : cerulean
+---
+
+***
+
+## Understand Problem Statement
+
+***
+
+The data is related with direct marketing campaigns of a Portuguese banking institution. The marketing campaigns were based on phone calls. Often, more than one contact to the same client was required, in order to access if the product (bank term deposit) would be ('yes') or not ('no') subscribed.
+
+Here is the description of the [data](https://archive.ics.uci.edu/ml/datasets/Bank+Marketing) variables.
+
+- `age` (numeric)
+- `job` : type of job (admin. / unknown / unemployed / management / housemaid / entrepreneur / student / blue-collar / self-employed / retired / technician / services) 
+- `marital` : marital status (married / divorced / single ; NOTE : divorced means divorced or widowed)
+- `education` (unknown / secondary / primary / tertiary)
+- `default` : has credit in default? (yes / no)
+- `balance` : average yearly balance, in euros (numeric) 
+- `housing` : has housing loan? (yes / no)
+- `loan` : has personal loan? (yes / no)
+- `contact` : contact communication type (unknown / telephone / cellular) 
+- `day` : last contact day of the month (numeric)
+- `month` : last contact month of year (jan / feb / mar / ... / nov / dec)
+- `duration` : last contact duration, in seconds (numeric)
+- `campaign` : number of contacts performed during this campaign and for this client (numeric, includes last contact)
+- `pdays` : number of days that passed by after the client was last contacted from a previous campaign (numeric, -1 means client was not previously contacted)
+- `previous` : number of contacts performed before this campaign and for this client (numeric)
+- `poutcome` : outcome of the previous marketing campaign (unknown / other / failure / success)
+- `y` : has the client subscribed to a __term deposit?__ (yes / no)
+
+##### Deposit ( y ) is our target / dependent variable.
+
+We have seen Linear Regression which can be used when the target variable is a quantitative variable. It computes the best fit line that can take any value on the number line.
+
+Logistic Regression is applied when target variable is categorical with 2 categories. It uses the logistic / sigmoid function to compute the probabilities in the range of 0 to 1. We select a threshold and clip all the values on either side of threshold to respective category.
+
+***
+
+## MODEL FLOW
+
+*** 
+
+### Prepare the environment
+
+```{r echo=FALSE}
+
+# Clear the environment
+rm(list = ls(all.names =  T))
+
+```
+
+- Load the libraries
+
+```{r message=FALSE}
+#install.packages('e1071')
+library(e1071)
+library(DataExplorer)
+library(ROCR)
+library(caret)
+library(ROCR)
+
+```
+
+- Load the dataset
+
+The data is in a text file and the values are separated by ";". We will use `read.table()` function to read in the data.
+
+```{r}
+
+data <- read.table("C:/Users/TEC/Downloads/20190921_CSE7402c_Batch70_Lab03_LogisticRegressionStudent/20190921_CSE7402c_Batch70_Lab03_LogisticRegression-Student/data/bank.txt", header = T,  sep = ";")
+summary(data)
+
+
+```
+
+***
+
+### Summary Statistics
+
+The minimum age of the client in the bank is 19 years and maximum is 87.
+Majority of the clients in the bank are from Management, blue collar and Technician.
+. Most of the clients are married.
+. Majority of education is 
+
+- View the top and last 5 data rows
+
+```{r}
+head(data)
+
+```
+
+- Study the structure of the data
+
+```{r}
+str(data)
+```
+
+- Study the summary statistics of the data
+
+```{r}
+
+```
+
+> Write your Observations below.
+
+***
+
+### Data Preprocessing 
+
+- Check NA Values
+
+```{r}
+
+colSums(is.na(data))
+
+```
+
+***
+
+### Train - Test Split
+
+```{r}
+set.seed(123)
+trainIndexC <- createDataPartition(data$y, p = .7, list = F)
+banktrain <- data[ trainIndexC, ]
+banktest <- data[-trainIndexC, ]
+head(banktrain)
+
+```
+
+***
+
+### Model Training
+
+We will use `glm` function to build our logistic model. 
+
+glm provides a generalisation of OLS regression when error distribution is other than normal. It defines a link function to relate linear predictors with the response variables.  
+The binomial family the links _logit (default)_, probit, cauchit, (corresponding to logistic, normal and Cauchy CDFs respectively) log and cloglog (complementary log-log).
+
+```{r}
+
+data_glm <- glm(formula = y~., family = binomial, data = banktrain)
+summary(data_glm)
+table(data$y)
+table(banktrain$y)
+table(banktest$y)
+
+```
+
+***
+
+### Analyse Model Summary
+
+  - Call : Function call used to compute the regression model.
+  - Deviance Residuals : Five-Number Summary of the deviance residuals.
+  - Coefficients : Regression Beta Coefficients for intercept and all independent variable. 
+  - Coefficient Test Statistic : T-test statistics for Significance of Coefficients. 
+
+##### Is the Slope significant ?
+
+    * Null Hypothesis (H0): The slope of the x variable is equal to zero (i.e., no relationship between x and y)
+    * Alternative Hypothesis (Ha): The slope of the x variable is not equal to zero (i.e., there is some relationship between x and y)
+
+  - Significance Codes : 0% - 0.1% ( *** ), 0.1% - 1% ( ** ), 1% - 5% ( * ), 5% - 10% ( . ), > 10% (   )
+  - Null Deviance : Log likelihood when no predictors are used ( similar to SST )
+  - Residual Deviance : How much remains unexplained gievn the predictors ( similar to SSE )
+  - AIC : This is useful in compairing two models but not very informative, on its own. For Logisic Regression, $AIC = D + 2k$
+
+##### Residuals
+
+We can get the residuals using `residuals()` function.
+
+```{r}
+
+res = residuals(data_glm, "deviance")
+summary(res)
+
+```
+
+##### Log Likelihood
+
+We can get the likelihood using `logLik()` function.
+
+```{r}
+
+logLik(data_glm)
+
+```
+
+##### Residual Deviance
+
+$$Residual Deviance = -2 * loglikelihood$$
+
+The loglikelihood is multiplied by a factor of -2 because based on the [Likelihood-ratio test](https://en.wikipedia.org/wiki/Likelihood-ratio_test#Distribution:_Wilks.E2.80.99_theorem) this gives the chi-squared distribution. It can be interpreted as the squared 'distance' between the maximum likelihood estimate of the parameters and their values under the null hypothesis.
+
+##### Logistic Regression Equation
+
+Unlike Linear Regression in which equation denotes the target variable, Logistic Regression equation gives Log of Odds Ratio ( Logit ). We take exponent of the equation and use it in the logistic equation to get the probabilities.
+
+$$p = \frac{1}{1 - e^{-\mu}} = \frac{e^{\mu}}{1 + e^{\mu}}$$
+
+Here, $\mu = \beta_o + \beta_1.x_1 + .... + \beta_k.x_k$
+
+p is the probability that the data point lies in the positive class.
+
+In order to find the best coefficient values, we cannot use sum of squared residuals as optimisation function as we are working with probabilities.
+
+##### Maximum Likelihood
+
+We use maximum likelihood i.e. coefficient that maximum the chances of predicting the right class for the data point. There are many different 
+We maximise likelihood for logistic regression by minimising the log-likelihood.
+
+$$Log Likelihood = \sum^n_{i = 1} (y_i.log(\hat{y_i}) + (1 - y_i).log(1 - \hat{y_i})) $$
+
+We take the logs as the probabilities values are between 0 and 1, multiplying them results in a very small number. It is easier to handle addition and $log(ab) = log(a) + log(b)$. As log of values between 0 and 1 is negative, we use a factor of -1 to convert the value to positive.
+
+This gives us the Residual Deviance (i.e. difference from true class) which we try to minimise.
+
+***
+
+### Model Evaluation
+
+We will use predict() function for predict. 
+
+- Default value (link) for `type` argument give the log of odds value.
+- `type = 'response'` gives the probability.
+
+```{r}
+
+prob_test <- predict(data_glm, banktest, type = 'response')
+summary(prob_test)
+```
+
+We pick the threshold 0.5 by default and convert the values. 
+
+- positive class when probability is above 0.5
+- negative class when probability is below 0.5
+
+```{r}
+
+preds_test <- ifelse(prob_test > 0.5, 'yes', 'no')
+head(preds_test)
+```
+
+We use `confusionMatrix` function from caret to calculate a cross-tabulation of observed and predicted classes.
+
+```{r}
+
+confusionMatrix(as.factor(preds_test), banktest$y, positive = 'yes')
+
+```
+
+Like regression problems, classification problems also have various error metrics and we have to pick the appropriate metric based on our need.
+
+#### Specificity
+
+We use specificity when we want to minimise the false positives.
+
+$${Specificity} = \frac{Number~of~True~Negatives}{Number~of~True~Negatives + Number~of~False~Positives}$$
+##### Think of use cases when Specificity is more relevant?
+
+#### Sensitivity
+
+We use sensitivity when we want to minimise the false negatives
+
+$${Sensitivity} = \frac{Number~of~True~Positives}{Number~of~True~Positives + Number~of~False~Negatives}$$
+##### Think of use cases when Senitivity is more relevant?
+
+#### Accuracy
+
+We use accuracy when we want to maximise the true prediction for both classes.
+
+$${Accuracy} = \frac{Number~of~True~Positives +Number~of~True~Negatives}{Number~Of~Subjects~in~the~Population}$$
+
+#### Kappa Metric
+
+Kappa metric quantifies how accurate the prediction algorithm is when compared to a random prediction
+
+$$Kappa = \frac{TotalAccuracy - RandomAccuracy}{1 - RandomAccuracy}$$
+
+##### We can also calculate these values manually using the formula. 
+
+Let us look at it just for reference as we are learning the concept for the first time.
+
+```{r}
+
+test_data_labs <- bank_test$y
+conf_matrix <- table(test_data_labs, preds_test)
+print(conf_matrix)
+
+specificity <- conf_matrix[1, 1]/sum(conf_matrix[1, ])
+print(specificity)
+
+sensitivity <- conf_matrix[2, 2]/sum(conf_matrix[2, ])
+print(sensitivity)
+
+accuracy <- sum(diag(conf_matrix))/sum(conf_matrix)
+print(accuracy)
+
+```
+
+***
+
+## MODEL IMPORVEMENT
+
+***
+
+### ROC
+
+Logistic Regression gives a probability score between 0 and 1, not the original levels (0 and 1) of the response variable. Hence we must first choose a cutoff point for translating the probabilities to the levels.
+
+**ROC curve evaluates how well the regression has achieved the separation between the classes at all threshold values.**
+
+#### Create a ROC Plot
+
+- Get a list of predictions (probability scores) using the predict() function
+
+```{r}
+prob_train <- predict(data_glm, type ='response')
+pred <- prediction(prob_train, banktrain$y)
+
+
+```
+
+- Create a `prediction()` object, using the ROCR package.
+
+The prediction object contains a list of predictions (probability scores), original class labels, cutoffs, false positives, true positives, true negatives, false negatives, No. of positive predictions and No. of negative predictions corresponding to these cutoffs. Class distribution in the dataset.
+
+```{r message=FALSE}
+
+perf <- performance(pred, measure = 'tpr', x.measure = 'fpr')
+
+```
+
+-  Extract performance measures (True Positive Rate and False Positive Rate) using the `performance()` function from the ROCR package
+
+```{r}
+
+plot(perf, print.cutoffs.at = seq(0,1, 0.05), colorise = T)
+
+```
+
+- Plot the ROC curve using the extracted performance measures (TPR and FPR)
+
+```{r}
+
+
+
+```
+
+#### Extract the AUC score
+
+Use the `performance()` function on the prediction object created above using the ROCR package, to extract the AUC score
+
+```{r}
+
+
+
+```
+
+#### Choose a Cutoff Value
+
+Based on the trade off between TPR and FPR depending on the business domain, a call on the cutoff has to be made.
+
+- A cutoff of 0.1 can be chosen
+
+***
+
+#### Evaluate Model based on cut off
+
+After choosing a cutoff value of 0.1, let's predict the class labels on the test data using our model.
+
+```{r}
+
+
+
+```
+
+***
